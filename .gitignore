@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+
+# Playwright artifacts
+reports/
+test-results/
+playwright-report/
+playwright/.cache/
+blob-report/
+
+# Playwright MCP session artifacts (if used for exploratory verification)
+.playwright-mcp/
+
+# Editor/OS
+.DS_Store
+*.log

@@ -1,0 +1,150 @@
+# UI Playwright Framework
+
+A production-ready skeleton for UI test automation with [Playwright Test](https://playwright.dev/) + TypeScript, using the Page Object Model.
+
+The example suite runs against the public [the-internet](https://the-internet.herokuapp.com/login) QA sandbox so the project works out of the box with `npm test`. A second suite under `tests/opencart/` covers [opencart.com](https://www.opencart.com/) (see [OpenCart.com suite](#opencartcom-suite) below) as a fuller, real-world example — replace either (or both) with your own application's.
+
+## Project structure
+
+```
+.
+├── playwright.config.ts     # Test runner config: projects, timeouts, retries, reporters
+├── tsconfig.json
+├── .env.example              # Copy to .env and fill in real values
+├── config/
+│   └── env.ts                 # Single source of truth for env vars (baseURL, credentials, opencart.baseURL)
+├── pages/
+│   ├── base.page.ts           # BasePage: shared navigation helpers, no assertions
+│   ├── login.page.ts          # Example Page Object (the-internet)
+│   ├── secure-area.page.ts    # Example Page Object (the-internet)
+│   ├── components/
+│   │   ├── flash-message.component.ts  # Shared region: the-internet's #flash banner
+│   │   ├── nav.component.ts            # Shared region: opencart.com's top nav
+│   │   └── alert.component.ts          # Shared region: opencart.com's .alert-danger banner
+│   └── opencart/
+│       ├── opencart-base.page.ts   # OpenCartBasePage: absolute-URL goto() for this 2nd site
+│       ├── home.page.ts            # OpenCartHomePage
+│       ├── marketplace.page.ts     # MarketplacePage — extension/theme search & listing
+│       ├── product.page.ts         # ProductPage — a single extension/theme's detail page
+│       ├── login.page.ts           # OpenCartLoginPage
+│       └── register.page.ts        # OpenCartRegisterPage
+├── fixtures/
+│   └── base.fixture.ts        # test.extend(...) wiring Page Objects (both suites) into fixtures
+├── utils/
+│   └── worker-scope.ts        # Helper for per-worker-unique test data
+├── tests/
+│   ├── example/
+│   │   └── login.spec.ts      # Example spec demonstrating the conventions below
+│   └── opencart/
+│       ├── home.spec.ts               # Homepage + primary nav
+│       ├── marketplace-search.spec.ts # Search, category filter, sort
+│       ├── product.spec.ts            # Free vs. commercial extension detail pages
+│       ├── cart-checkout.spec.ts      # Buy/Download → login redirect (this site's cart/checkout stand-in)
+│       └── account.spec.ts            # Login/Register forms — see note below, currently `.skip`
+└── reports/                    # Generated: HTML report, JUnit XML, traces, screenshots, video
+```
+
+## OpenCart.com suite
+
+`tests/opencart/` targets [www.opencart.com](https://www.opencart.com/) — which turns out to itself be an OpenCart storefront (it sells extensions/themes via a "Marketplace"), so it doubles as a fuller product-catalog/detail/auth example than the-internet.herokuapp.com offers. A few real, live-verified quirks worth knowing before extending this suite:
+
+- **No conventional cart/checkout.** `route=checkout/cart` 404s on this instance. "Buy" (commercial extensions) and "Download" (free ones) are the closest equivalents, and both simply redirect a signed-out visitor to the login page — see `cart-checkout.spec.ts`.
+- **`route=account/login` and `route=account/register` are Cloudflare-challenge-gated for fresh automated browser contexts.** Confirmed reproducible outside this framework (a standalone script launching plain Chromium, headless and headed, sat on Cloudflare's "Just a moment..." interstitial for 20+ seconds without it clearing). `account.spec.ts` and two tests in `home.spec.ts` are marked `.skip` for this reason — see the large comment at the top of `account.spec.ts` for the full writeup. Every other page in this suite loads normally in a fresh context.
+- **Rate limiting.** Running this suite's full browser matrix (chromium + firefox + webkit) back-to-back, repeatedly, in a short window can trip opencart.com's own Cloudflare rate limiter (HTTP 1015, a temporary IP-level ban) — a real characteristic of testing a live production site, not a bug in the suite. Prefer a single project locally, and avoid re-running the full matrix in a tight loop.
+- **Register's submit button is CAPTCHA-gated.** It stays `disabled` even once every required field has a value, until an image challenge is solved — this suite fills the form but deliberately never submits it, since it can't solve the challenge and this is opencart.com's real production account system.
+
+## Setup
+
+```bash
+npm install
+npm run install:browsers   # installs Chromium/Firefox/WebKit + OS deps
+cp .env.example .env       # fill in real values for your app
+```
+
+## Running tests
+
+```bash
+npm test                   # headless, all 3 browser projects, parallel
+npm run test:headed        # headed (visible browser)
+npm run test:ui            # Playwright's interactive UI mode — best for authoring
+npm run test:debug         # Playwright Inspector, step-through debugging
+npm run test:chromium      # single project only
+npx playwright test tests/example/login.spec.ts   # single file
+npx playwright test -g "signs in with valid"       # single test by title
+```
+
+View the last HTML report:
+
+```bash
+npm run report
+```
+
+## Writing a new test
+
+1. Add/extend a Page Object under `pages/` — see [Page Objects](#page-objects) below.
+2. If the Page Object should be available as a fixture, wire it into `fixtures/base.fixture.ts`.
+3. Add a spec under `tests/`, importing `test`/`expect` from `fixtures/base.fixture.ts` (not directly from `@playwright/test`), so it gets the project's fixtures:
+
+```ts
+import { test, expect } from '../../fixtures/base.fixture';
+
+test.describe('Feature name', () => {
+  test('does the thing', async ({ loginPage }) => {
+    await loginPage.goto();
+    // ... actions via the Page Object ...
+    await expect(loginPage.heading).toBeVisible(); // assertions live in the test
+  });
+});
+```
+
+Rules of thumb:
+- **One test, one behavior.** Keep tests independent — no test should depend on another having run first (`fullyParallel: true` is on by default and will happily interleave them).
+- Prefer `getByRole` / `getByLabel` / `getByText` locators; fall back to `getByTestId`; use raw CSS only as a last resort with a comment explaining why (see `flash-message.component.ts` for an example).
+- Use web-first assertions (`await expect(locator).toBeVisible()`) — never `page.waitForTimeout(...)`. Playwright auto-waits; a manual sleep is almost always masking a missing wait condition.
+- If a test needs to create its own data, make it worker-safe with `utils/worker-scope.ts`'s `uniqueId()` rather than a hardcoded value that could collide across parallel workers.
+
+## Page Objects
+
+- One class per page or reusable component: `<Name>Page` (e.g. `LoginPage`) or `<Name>Component` (e.g. `FlashMessageComponent`).
+- The constructor takes `Page` and stores every locator as a `readonly` field — locators are built once, not re-queried inside every method.
+- Page Objects expose **actions** (`login(user, pass)`) and **getters** (`this.heading`) only. They never contain `expect(...)` — that keeps failure messages pointing at the test's actual intent.
+- Extend `BasePage` for page-level navigation helpers (`goto`, `getTitle`, ...).
+- Compose (don't inherit) for regions shared *across* pages — e.g. `FlashMessageComponent` is instantiated by both `LoginPage` and `SecureAreaPage` instead of duplicating the locator or forcing an unrelated inheritance chain.
+
+## Fixtures
+
+`fixtures/base.fixture.ts` extends Playwright's `test` with one fixture per Page Object (`loginPage`, `secureAreaPage`, ...), created fresh per test. Import `test`/`expect` from this file in every spec instead of `@playwright/test` directly.
+
+This project intentionally does **not** ship an authenticated/`storageState` fixture or data factories/builders — designing those (auth session reuse via `globalSetup`, realistic domain data builders, network mocking) is a `test-data-engineer` concern. If your suite needs one, that's the place to add it; this file is where you'd consume it once it exists.
+
+## Parallel execution
+
+- `fullyParallel: true` in `playwright.config.ts` — tests run in parallel by default, across all projects/workers.
+- Tests must not share mutable state. If a spec genuinely needs to run serially (e.g. it depends on side effects from a previous test), that's a smell — isolate the shared state instead. Only reach for `test.describe.configure({ mode: 'serial' })` as a deliberate, documented exception.
+- Use `uniqueId()` from `utils/worker-scope.ts` (keyed off `testInfo.parallelIndex`) whenever a test creates its own data, so concurrent workers never collide.
+
+## Retries
+
+- `retries` is set to `2` on CI only (`retries: env.isCI ? 2 : 0`), never locally. A test that only passes on retry is a bug in the test (or the app), not something to paper over — investigate it rather than raising the retry count.
+- Never add `page.waitForTimeout(...)` to chase flakiness. Use `expect(locator).toBeVisible()` / `toHaveText()` / etc., which auto-retry against the live DOM state.
+
+## Debugging & the trace viewer
+
+- `trace: 'retain-on-failure'` is configured by default — every failed test on any run has a trace saved to `reports/test-results/.../trace.zip`, without needing to reproduce it.
+- On a CI failure, download the trace artifact and open it:
+
+  ```bash
+  npx playwright show-trace path/to/trace.zip
+  ```
+
+- Locally, `npm run test:debug` opens the Playwright Inspector for step-through debugging, and `npm run test:ui` opens UI mode, which gives you a timeline, DOM snapshots, and a "time travel" view without needing a separate trace file.
+- Screenshots and video are also captured `only-on-failure` / `retain-on-failure` (not for every run), so successful CI runs stay lightweight.
+
+## Configuration reference
+
+| Concern | Where | Notes |
+|---|---|---|
+| Base URL / env vars | `.env` (via `config/env.ts`) | Never read `process.env` directly in tests/pages |
+| Timeouts | `playwright.config.ts` (`timeout`, `expect.timeout`, `actionTimeout`, `navigationTimeout`) | Per-test/action overrides via `test.setTimeout()` if a specific test genuinely needs more |
+| Browsers | `playwright.config.ts` `projects` | Chromium, Firefox, WebKit configured; add/remove as needed |
+| Reports | `playwright.config.ts` `reporter` / `outputDir` | HTML + JUnit, all under `reports/` |
