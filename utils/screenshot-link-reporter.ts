@@ -59,7 +59,10 @@ function hyperlink(uri: string, text: string): string {
  * falls back to the plain path.
  */
 export default class ScreenshotLinkReporter implements Reporter {
-  onTestEnd(test: TestCase, result: TestResult): void {
+  // `test` (the TestCase) isn't used — the title is deliberately not
+  // repeated here, see the comment below — but is kept, underscore
+  // -prefixed, to match the `Reporter.onTestEnd` interface signature.
+  onTestEnd(_test: TestCase, result: TestResult): void {
     if (result.status === 'passed') {
       return;
     }
@@ -72,16 +75,13 @@ export default class ScreenshotLinkReporter implements Reporter {
       return;
     }
 
-    // Describe blocks + test title, e.g. "Marketplace search and filters ›
-    // searching for a known term returns matching extensions" — the same
-    // hierarchy `list`'s own failure summary uses, without the redundant
-    // project name/spec file path (the screenshot's own folder name already
-    // encodes those).
-    const title = test.titlePath().slice(3).join(' › ');
+    // No test title here deliberately: `list`'s own "✘ N [project] › file ›
+    // ... › title" line, printed immediately above this one, already
+    // identifies the test — repeating it here was pure duplication.
     const link = process.stdout.isTTY
       ? hyperlink(toFileUri(screenshot.path), screenshot.path)
       : screenshot.path;
 
-    console.log(`\n📸 Screenshot — ${title}\n   ${link}`);
+    console.log(`\n   📸 Screenshot: ${link}`);
   }
 }
