@@ -40,25 +40,20 @@ export default defineConfig({
   },
 
   reporter: [
-    // `printSteps` makes the terminal/VS Code console print each
-    // `test.step()` live as it runs (not just a final pass/fail summary
-    // line) — see the `test.step()` wrapping in Page Object action methods
-    // (e.g. `pages/opencart/marketplace.page.ts`'s `search()`). On a
-    // failure, the last step printed before the error is exactly what was
-    // in flight — no need to open the HTML report or a trace just to see
-    // where things went wrong.
-    ['list', { printSteps: true }],
+    // A from-scratch terminal reporter instead of the built-in `list` — see
+    // its own doc comment (reporters/custom-reporter.ts) for exactly why:
+    // in short, `list` repeats the same test identity across its live line
+    // and its final failure summary, and always prints Expected/Received
+    // *before* the source code frame, and neither of those is configurable
+    // via `list`'s own reporter options.
+    ['./reporters/custom-reporter.ts'],
     ['html', { outputFolder: 'reports/html', open: 'never' }],
     ['junit', { outputFile: 'reports/junit/results.xml' }],
     // Structured per-test attempt data — consumed by the CI "flag flaky
     // passes" quality gate (.github/workflows/playwright.yml), which reads
     // this to find any test that only passed after a retry. Not meant for
-    // humans; the list/html reporters above are.
+    // humans; the custom/html reporters above are.
     ['json', { outputFile: 'reports/results.json' }],
-    // Prints a directly clickable, absolute screenshot path the moment a
-    // test fails — see the reporter's own doc comment for why this exists
-    // alongside (not instead of) the attachment paths `list` already prints.
-    ['./utils/screenshot-link-reporter.ts'],
   ],
   outputDir: 'reports/test-results',
 

@@ -14,6 +14,6 @@
     "baseUrl": ".",
     "types": ["node", "@playwright/test"]
   },
-  "include": ["tests/**/*.ts", "pages/**/*.ts", "fixtures/**/*.ts", "config/**/*.ts", "utils/**/*.ts", "playwright.config.ts"],
+  "include": ["tests/**/*.ts", "pages/**/*.ts", "fixtures/**/*.ts", "config/**/*.ts", "utils/**/*.ts", "reporters/**/*.ts", "playwright.config.ts"],
   "exclude": ["node_modules", "reports", "test-results"]
 }

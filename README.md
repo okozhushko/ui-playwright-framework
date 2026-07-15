@@ -2,7 +2,7 @@
 
 A production-ready skeleton for UI test automation with [Playwright Test](https://playwright.dev/) + TypeScript, using the Page Object Model.
 
-The example suite runs against the public [the-internet](https://the-internet.herokuapp.com/login) QA sandbox so the project works out of the box with `npm test`. A second suite under `tests/opencart/` covers [opencart.com](https://www.opencart.com/) (see [OpenCart.com suite](#opencartcom-suite) below) as a fuller, real-world example — replace either (or both) with your own application's.
+The suite under `tests/opencart/` covers [opencart.com](https://www.opencart.com/) (see [OpenCart.com suite](#opencartcom-suite) below) as a real-world example — replace it with your own application's.
 
 ## Project structure
 
@@ -15,26 +15,24 @@ The example suite runs against the public [the-internet](https://the-internet.he
 │   └── env.ts                 # Single source of truth for env vars (baseURL, credentials, opencart.baseURL)
 ├── pages/
 │   ├── base.page.ts           # BasePage: shared navigation helpers, no assertions
-│   ├── login.page.ts          # Example Page Object (the-internet)
-│   ├── secure-area.page.ts    # Example Page Object (the-internet)
 │   ├── components/
-│   │   ├── flash-message.component.ts  # Shared region: the-internet's #flash banner
 │   │   ├── nav.component.ts            # Shared region: opencart.com's top nav
 │   │   └── alert.component.ts          # Shared region: opencart.com's .alert-danger banner
 │   └── opencart/
-│       ├── opencart-base.page.ts   # OpenCartBasePage: absolute-URL goto() for this 2nd site
+│       ├── opencart-base.page.ts   # OpenCartBasePage: absolute-URL goto() for this site
 │       ├── home.page.ts            # OpenCartHomePage
 │       ├── marketplace.page.ts     # MarketplacePage — extension/theme search & listing
 │       ├── product.page.ts         # ProductPage — a single extension/theme's detail page
 │       ├── login.page.ts           # OpenCartLoginPage
 │       └── register.page.ts        # OpenCartRegisterPage
 ├── fixtures/
-│   └── base.fixture.ts        # test.extend(...) wiring Page Objects (both suites) into fixtures
+│   └── base.fixture.ts        # test.extend(...) wiring Page Objects into fixtures
 ├── utils/
 │   └── worker-scope.ts        # Helper for per-worker-unique test data
+├── reporters/
+│   ├── custom-reporter.ts     # Terminal reporter used instead of the built-in `list` — see below
+│   └── terminal-links.ts      # OSC 8 clickable-hyperlink helper, used by custom-reporter.ts
 ├── tests/
-│   ├── example/
-│   │   └── login.spec.ts      # Example spec demonstrating the conventions below
 │   └── opencart/
 │       ├── home.spec.ts               # Homepage + primary nav
 │       ├── marketplace-search.spec.ts # Search, category filter, sort
@@ -110,7 +108,7 @@ Rules of thumb:
 - Page Objects expose **actions** (`login(user, pass)`) and **getters** (`this.heading`) only. They never contain `expect(...)` — that keeps failure messages pointing at the test's actual intent.
 - Extend `BasePage` for page-level navigation helpers (`goto`, `getTitle`, ...).
 - Compose (don't inherit) for regions shared *across* pages — e.g. `FlashMessageComponent` is instantiated by both `LoginPage` and `SecureAreaPage` instead of duplicating the locator or forcing an unrelated inheritance chain.
-- Wrap a Page Object action's body in `test.step('...', async () => { ... })` (import `test` directly from `@playwright/test` inside the Page Object file — see `pages/opencart/marketplace.page.ts`'s `search()`). Combined with `['list', { printSteps: true }]` in `playwright.config.ts`, this prints each step live in the terminal/VS Code console as it runs, so a failure's last-printed step is exactly what was in flight — no need to open the HTML report or a trace just to see where a test broke.
+- Wrap a Page Object action's body in `test.step('...', async () => { ... })` (import `test` directly from `@playwright/test` inside the Page Object file — see `pages/opencart/marketplace.page.ts`'s `search()`). `reporters/custom-reporter.ts` prints each `test.step()` live in the terminal/VS Code console as it runs, so a failure's last-printed step is exactly what was in flight — no need to open the HTML report or a trace just to see where a test broke.
 
 ## Fixtures
 
@@ -153,7 +151,15 @@ This project intentionally does **not** ship an authenticated/`storageState` fix
 
 - Locally, `npm run test:debug` opens the Playwright Inspector for step-through debugging, and `npm run test:ui` opens UI mode, which gives you a timeline, DOM snapshots, and a "time travel" view without needing a separate trace file.
 - Screenshots and video are also captured `only-on-failure` / `retain-on-failure` (not for every run), so successful CI runs stay lightweight.
-- `utils/screenshot-link-reporter.ts` prints a failed test's screenshot as an absolute path on its own line the moment it fails — VS Code's integrated terminal detects this as a link, so Cmd/Ctrl-clicking it opens the screenshot directly, no need to dig through `reports/test-results/` by hand.
+
+## Console output (`reporters/custom-reporter.ts`)
+
+A from-scratch terminal reporter, used instead of the built-in `list`. Replaced `list` (rather than just supplementing it, which is how this started) because two things weren't achievable via `list`'s own reporter options:
+
+- `list` prints the same test identity twice — once on its live per-test line, again in its final numbered failure summary. This reporter prints each test exactly once: one line with the project, full title, and outcome (e.g. `✘ 1 [chromium] Extension detail page › shows a Buy button and price for a commercial extension (8.8s)`).
+- `list` always prints the error message (where `Expected`/`Received` live) *before* the source code frame. This reporter prints them in the other order — code location + code frame first, then the message — because `TestError`'s `location`/`snippet`/`message` are separate, stable fields, not a single blob that has to be parsed to reorder.
+
+It also prints each `test.step()` live as it runs (see **Page Objects** above) and a clickable screenshot link on failure (`reporters/terminal-links.ts` — an OSC 8 terminal hyperlink, confirmed live that relying on a terminal to *heuristically* recognize a bare path as a link isn't reliable enough; only emitted when `process.stdout.isTTY`, so a non-interactive log doesn't get raw escape-byte clutter). The `html`/`junit`/`json` reporters are unaffected and still produce their usual artifacts under `reports/`.
 
 ## Configuration reference
 
