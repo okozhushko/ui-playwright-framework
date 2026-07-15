@@ -1,0 +1,77 @@
+name: Playwright Tests
+
+# Deliberately conservative triggers/scope — see the comments below on why
+# this doesn't run the full browser matrix on every push.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Lets anyone trigger a run on demand from the Actions tab, e.g. to
+  # re-verify after opencart.com's own rate limiting has cleared (see
+  # README.md's "OpenCart.com suite" section).
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Playwright (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      # Only chromium's browser binary, and only chromium is exercised below.
+      # This suite targets opencart.com, a real production site behind
+      # Cloudflare — running its full 3-browser matrix from GitHub's shared
+      # runner IP ranges (which Cloudflare's WAF already sees heavy,
+      # unrelated CI traffic from) is a real way to trip the site's own rate
+      # limiter, as documented in README.md. One browser project keeps this
+      # pipeline's footprint modest and predictable; add firefox/webkit back
+      # here only if that risk has been evaluated for your environment.
+      - name: Install Playwright browser (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        run: npx playwright test --project=chromium
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-html-report
+          path: reports/html
+          retention-days: 14
+
+      - name: Upload traces, screenshots & videos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: reports/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload JUnit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-junit
+          path: reports/junit
+          retention-days: 14
