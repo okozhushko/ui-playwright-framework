@@ -43,6 +43,11 @@ export default defineConfig({
     ['list'],
     ['html', { outputFolder: 'reports/html', open: 'never' }],
     ['junit', { outputFile: 'reports/junit/results.xml' }],
+    // Structured per-test attempt data — consumed by the CI "flag flaky
+    // passes" quality gate (.github/workflows/playwright.yml), which reads
+    // this to find any test that only passed after a retry. Not meant for
+    // humans; the list/html reporters above are.
+    ['json', { outputFile: 'reports/results.json' }],
   ],
   outputDir: 'reports/test-results',
 

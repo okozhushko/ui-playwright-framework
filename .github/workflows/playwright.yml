@@ -7,14 +7,58 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # 01:00 UTC ≈ 03:00–04:00 Europe/Kyiv depending on DST — an off-hours
+    # nightly run, timed so it's unlikely to overlap with anyone actively
+    # iterating on the suite during the day (and with other CI traffic that
+    # might already have opencart.com's Cloudflare on edge — see the
+    # "OpenCart.com suite" section in README.md).
+    - cron: '0 1 * * *'
   # Lets anyone trigger a run on demand from the Actions tab, e.g. to
-  # re-verify after opencart.com's own rate limiting has cleared (see
-  # README.md's "OpenCart.com suite" section).
+  # re-verify after opencart.com's own rate limiting has cleared.
   workflow_dispatch:
 
 jobs:
-  test:
+  # Fast, free-of-network-flakiness checks that gate the (slower, live-site,
+  # Cloudflare-exposed) e2e job below. No point spending time installing
+  # browsers and hitting opencart.com if these fail.
+  quality-gates:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      # Belt-and-braces alongside playwright.config.ts's `forbidOnly` (which
+      # only fails at test-run time, after browsers are already installed
+      # and the suite has started hitting the live site) — this catches an
+      # accidentally committed `test.only`/`describe.only` immediately, for
+      # free, before any of that.
+      - name: Fail on leftover test.only()/describe.only()
+        run: |
+          if grep -rEn "\.only\s*\(" tests/; then
+            echo "::error::test.only()/describe.only() found above — remove it before merging. It would also fail the e2e job below via playwright.config.ts's forbidOnly, just later and more expensively."
+            exit 1
+          fi
+          echo "No .only() found in tests/."
+
+  e2e:
     name: Playwright (chromium)
+    needs: quality-gates
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -34,9 +78,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check
-        run: npm run typecheck
-
       # Only chromium's browser binary, and only chromium is exercised below.
       # This suite targets opencart.com, a real production site behind
       # Cloudflare — running its full 3-browser matrix from GitHub's shared
@@ -50,6 +91,15 @@ jobs:
 
       - name: Run Playwright tests
         run: npx playwright test --project=chromium
+
+      # Quality gate: reads the JSON reporter's per-attempt results (see
+      # playwright.config.ts) to flag any test that only passed after a
+      # retry — a warning annotation + job summary, not a hard failure. See
+      # the script's own header comment for why it stops short of failing
+      # the build here.
+      - name: Flag tests that only passed after a retry
+        if: always()
+        run: node .github/scripts/check-flaky-passes.js reports/results.json
 
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
