@@ -26,10 +26,14 @@ export class ProductPage extends OpenCartBasePage {
   readonly buyButton: Locator;
 
   /**
-   * The "Price" panel next to `buyButton` (e.g. "$49.00"). Purely
-   * presentational text with no accessible role/label of its own, so this
-   * falls back to the theme's `#price` id — confirmed live it's unique on
-   * the page and only rendered alongside `buyButton`.
+   * The price value itself (e.g. "$49.00"), not the whole "Price" panel.
+   * The panel (`#price`) is a two-column Bootstrap row — a "Price" label
+   * next to the value — and asserting against the *whole row* pulls in the
+   * label text plus all the whitespace/newlines between the two columns,
+   * which turns a test failure's diff into an unreadable wall of blank
+   * space (confirmed live). Scoping to `#price` and filtering by content
+   * (text starting with `$`) instead keeps the locator to exactly the
+   * value under test, so a mismatch prints one clean line, not several.
    */
   readonly priceValue: Locator;
 
@@ -51,7 +55,7 @@ export class ProductPage extends OpenCartBasePage {
     this.nav = new NavComponent(page);
     this.heading = page.getByRole('heading', { level: 3 }).first();
     this.buyButton = page.getByRole('button', { name: 'Buy' });
-    this.priceValue = page.locator('#price');
+    this.priceValue = page.locator('#price').getByText(/^\$/);
     this.downloadLink = page.locator('a[href*="route=marketplace/download"]');
     this.loginToCommentLink = page.getByRole('link', { name: 'Login my OpenCart Account' });
   }
