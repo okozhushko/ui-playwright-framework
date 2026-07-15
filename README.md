@@ -128,6 +128,19 @@ This project intentionally does **not** ship an authenticated/`storageState` fix
 - `retries` is set to `2` on CI only (`retries: env.isCI ? 2 : 0`), never locally. A test that only passes on retry is a bug in the test (or the app), not something to paper over — investigate it rather than raising the retry count.
 - Never add `page.waitForTimeout(...)` to chase flakiness. Use `expect(locator).toBeVisible()` / `toHaveText()` / etc., which auto-retry against the live DOM state.
 
+## Continuous Integration
+
+`.github/workflows/playwright.yml` runs on push/PR to `main`, nightly (`01:00 UTC`), and on demand (`workflow_dispatch`, with inputs to pick a project or a specific spec).
+
+- **Two jobs, gated:** `quality-gates` (typecheck + a leftover `test.only()`/`describe.only()` check) must pass before the slower, live-site `e2e` job installs a browser and runs anything against opencart.com.
+- **`concurrency`** cancels a stale in-flight run when a new one starts on the same branch — avoids two runs hammering opencart.com at once.
+- **`permissions: contents: read`** — least privilege; nothing here needs to write to the repo.
+- Actions are pinned by commit SHA (with a version comment), not a mutable tag — see `.github/dependabot.yml`, which opens a PR to bump both when a new release ships.
+- Playwright's browser binary is cached (`actions/cache`, keyed on `package-lock.json`) between runs.
+- The whole `playwright test` invocation is wrapped in an outer retry (`nick-fields/retry`, 2 attempts) — distinct from Playwright's own per-test `retries` above — specifically to give opencart.com's Cloudflare rate limiting a chance to clear before the next attempt.
+- `.github/scripts/check-flaky-passes.js` reads the JSON reporter's per-attempt data to flag (warn, not fail) any test that only passed after a retry — surfacing exactly what the **Retries** section above says to watch for, instead of letting a green checkmark hide it.
+- `.github/scripts/write-job-summary.js` posts a pass/fail/skip/flaky count table to the run's Summary page.
+
 ## Debugging & the trace viewer
 
 - `trace: 'retain-on-failure'` is configured by default — every failed test on any run has a trace saved to `reports/test-results/.../trace.zip`, without needing to reproduce it.

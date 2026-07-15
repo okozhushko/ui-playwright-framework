@@ -15,8 +15,33 @@ on:
     # "OpenCart.com suite" section in README.md).
     - cron: '0 1 * * *'
   # Lets anyone trigger a run on demand from the Actions tab, e.g. to
-  # re-verify after opencart.com's own rate limiting has cleared.
+  # re-verify after opencart.com's own rate limiting has cleared, or to spot
+  # -check a different project/spec without editing this file.
   workflow_dispatch:
+    inputs:
+      project:
+        description: Playwright project to run
+        type: choice
+        options: [chromium, firefox, webkit]
+        default: chromium
+      spec:
+        description: 'Optional: specific spec file/glob (leave empty for the whole suite)'
+        type: string
+        required: false
+
+# A new push/dispatch on the same branch supersedes any run already in
+# flight instead of piling up alongside it — this is exactly what protected
+# us from ourselves during development, when a manual dispatch and a push
+# briefly ran concurrently and doubled up on requests to opencart.com.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least-privilege default: nothing in this workflow needs to write to the
+# repo, comment on PRs, or touch packages — read-only is enough to check out
+# code and run tests.
+permissions:
+  contents: read
 
 jobs:
   # Fast, free-of-network-flakiness checks that gate the (slower, live-site,
@@ -29,10 +54,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -57,20 +82,22 @@ jobs:
           echo "No .only() found in tests/."
 
   e2e:
-    name: Playwright (chromium)
+    name: Playwright (${{ github.event.inputs.project || 'chromium' }})
     needs: quality-gates
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Generous enough to cover the whole-run retry below (2 attempts × up to
+    # 10 minutes each) plus setup/install overhead.
+    timeout-minutes: 30
 
     env:
       CI: 'true'
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           cache: npm
@@ -78,50 +105,86 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Only chromium's browser binary, and only chromium is exercised below.
-      # This suite targets opencart.com, a real production site behind
-      # Cloudflare — running its full 3-browser matrix from GitHub's shared
-      # runner IP ranges (which Cloudflare's WAF already sees heavy,
-      # unrelated CI traffic from) is a real way to trip the site's own rate
-      # limiter, as documented in README.md. One browser project keeps this
-      # pipeline's footprint modest and predictable; add firefox/webkit back
-      # here only if that risk has been evaluated for your environment.
-      - name: Install Playwright browser (chromium)
-        run: npx playwright install --with-deps chromium
+      # Playwright's own browser binaries rarely change between runs (only
+      # when @playwright/test itself is upgraded), so cache them by lockfile
+      # hash instead of re-downloading on every single run.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
+      # Only chromium's browser binary by default, and only chromium runs
+      # below by default. This suite targets opencart.com, a real production
+      # site behind Cloudflare — running its full 3-browser matrix from
+      # GitHub's shared runner IP ranges (which Cloudflare's WAF already
+      # sees heavy, unrelated CI traffic from) is a real way to trip the
+      # site's own rate limiter, as documented in README.md. Use the
+      # `workflow_dispatch` "project" input to spot-check firefox/webkit
+      # on demand instead of adding them to the default matrix.
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps ${{ github.event.inputs.project || 'chromium' }}
+
+      # The binary is cached, but system-level OS packages (fonts, codecs,
+      # etc. installed by `--with-deps`) live outside `~/.cache/ms-playwright`
+      # and aren't restored by actions/cache — still need this on a cache hit.
+      - name: Install OS dependencies only (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps ${{ github.event.inputs.project || 'chromium' }}
+
+      # Wraps the whole `playwright test` invocation (not just Playwright's
+      # own per-test `retries`, which only re-run individual failing tests
+      # within one invocation) in a second, outer retry. This specifically
+      # targets opencart.com's Cloudflare rate limiting, where a short cool
+      # -down before a fresh full run has a real chance of succeeding —
+      # confirmed live during development that a rate-limited run recovered
+      # on a later, independent invocation.
       - name: Run Playwright tests
-        run: npx playwright test --project=chromium
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          retry_wait_seconds: 45
+          command: npx playwright test --project=${{ github.event.inputs.project || 'chromium' }} ${{ github.event.inputs.spec }}
 
       # Quality gate: reads the JSON reporter's per-attempt results (see
-      # playwright.config.ts) to flag any test that only passed after a
-      # retry — a warning annotation + job summary, not a hard failure. See
-      # the script's own header comment for why it stops short of failing
-      # the build here.
+      # playwright.config.ts) to flag any test that only passed after
+      # Playwright's own internal retry — a warning annotation + job
+      # summary, not a hard failure. See the script's own header comment
+      # for why it stops short of failing the build here.
       - name: Flag tests that only passed after a retry
         if: always()
         run: node .github/scripts/check-flaky-passes.js reports/results.json
 
+      - name: Write job summary
+        if: always()
+        run: node .github/scripts/write-job-summary.js reports/results.json
+
       - name: Upload HTML report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: playwright-html-report
+          # Suffixed by project so this stays collision-free if
+          # firefox/webkit are ever added to a real matrix alongside this.
+          name: playwright-html-report-${{ github.event.inputs.project || 'chromium' }}
           path: reports/html
           retention-days: 14
 
       - name: Upload traces, screenshots & videos
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: playwright-test-results
+          name: playwright-test-results-${{ github.event.inputs.project || 'chromium' }}
           path: reports/test-results
           retention-days: 14
           if-no-files-found: ignore
 
       - name: Upload JUnit results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: playwright-junit
+          name: playwright-junit-${{ github.event.inputs.project || 'chromium' }}
           path: reports/junit
           retention-days: 14

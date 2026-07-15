@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Keeps pinned-by-SHA GitHub Actions versions (see playwright.yml) from
+  # silently going stale — Dependabot opens a PR bumping both the SHA and
+  # its version comment when a new release ships.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
