@@ -153,6 +153,7 @@ This project intentionally does **not** ship an authenticated/`storageState` fix
 
 - Locally, `npm run test:debug` opens the Playwright Inspector for step-through debugging, and `npm run test:ui` opens UI mode, which gives you a timeline, DOM snapshots, and a "time travel" view without needing a separate trace file.
 - Screenshots and video are also captured `only-on-failure` / `retain-on-failure` (not for every run), so successful CI runs stay lightweight.
+- `utils/screenshot-link-reporter.ts` prints a failed test's screenshot as an absolute path on its own line the moment it fails — VS Code's integrated terminal detects this as a link, so Cmd/Ctrl-clicking it opens the screenshot directly, no need to dig through `reports/test-results/` by hand.
 
 ## Configuration reference
 

@@ -55,6 +55,10 @@ export default defineConfig({
     // this to find any test that only passed after a retry. Not meant for
     // humans; the list/html reporters above are.
     ['json', { outputFile: 'reports/results.json' }],
+    // Prints a directly clickable, absolute screenshot path the moment a
+    // test fails — see the reporter's own doc comment for why this exists
+    // alongside (not instead of) the attachment paths `list` already prints.
+    ['./utils/screenshot-link-reporter.ts'],
   ],
   outputDir: 'reports/test-results',
 
