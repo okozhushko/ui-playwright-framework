@@ -110,6 +110,7 @@ Rules of thumb:
 - Page Objects expose **actions** (`login(user, pass)`) and **getters** (`this.heading`) only. They never contain `expect(...)` — that keeps failure messages pointing at the test's actual intent.
 - Extend `BasePage` for page-level navigation helpers (`goto`, `getTitle`, ...).
 - Compose (don't inherit) for regions shared *across* pages — e.g. `FlashMessageComponent` is instantiated by both `LoginPage` and `SecureAreaPage` instead of duplicating the locator or forcing an unrelated inheritance chain.
+- Wrap a Page Object action's body in `test.step('...', async () => { ... })` (import `test` directly from `@playwright/test` inside the Page Object file — see `pages/opencart/marketplace.page.ts`'s `search()`). Combined with `['list', { printSteps: true }]` in `playwright.config.ts`, this prints each step live in the terminal/VS Code console as it runs, so a failure's last-printed step is exactly what was in flight — no need to open the HTML report or a trace just to see where a test broke.
 
 ## Fixtures
 

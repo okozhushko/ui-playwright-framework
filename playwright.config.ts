@@ -40,7 +40,14 @@ export default defineConfig({
   },
 
   reporter: [
-    ['list'],
+    // `printSteps` makes the terminal/VS Code console print each
+    // `test.step()` live as it runs (not just a final pass/fail summary
+    // line) — see the `test.step()` wrapping in Page Object action methods
+    // (e.g. `pages/opencart/marketplace.page.ts`'s `search()`). On a
+    // failure, the last step printed before the error is exactly what was
+    // in flight — no need to open the HTML report or a trace just to see
+    // where things went wrong.
+    ['list', { printSteps: true }],
     ['html', { outputFolder: 'reports/html', open: 'never' }],
     ['junit', { outputFile: 'reports/junit/results.xml' }],
     // Structured per-test attempt data — consumed by the CI "flag flaky

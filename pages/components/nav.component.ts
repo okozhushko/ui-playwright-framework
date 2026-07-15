@@ -1,3 +1,4 @@
+import { test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 
 /**
@@ -37,14 +38,20 @@ export class NavComponent {
   }
 
   async goToMarketplace(): Promise<void> {
-    await this.marketplaceLink.click();
+    await test.step('Nav: go to Marketplace', async () => {
+      await this.marketplaceLink.click();
+    });
   }
 
   async goToLogin(): Promise<void> {
-    await this.loginLink.click();
+    await test.step('Nav: go to Login', async () => {
+      await this.loginLink.click();
+    });
   }
 
   async goToRegister(): Promise<void> {
-    await this.registerLink.click();
+    await test.step('Nav: go to Register', async () => {
+      await this.registerLink.click();
+    });
   }
 }

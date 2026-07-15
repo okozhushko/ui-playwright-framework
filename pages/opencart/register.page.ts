@@ -1,3 +1,4 @@
+import { test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { OpenCartBasePage } from './opencart-base.page';
 import { NavComponent } from '../components/nav.component';
@@ -58,11 +59,13 @@ export class OpenCartRegisterPage extends OpenCartBasePage {
     country: string;
     password: string;
   }): Promise<void> {
-    await this.usernameInput.fill(details.username);
-    await this.firstNameInput.fill(details.firstName);
-    await this.lastNameInput.fill(details.lastName);
-    await this.emailInput.fill(details.email);
-    await this.countrySelect.selectOption(details.country);
-    await this.passwordInput.fill(details.password);
+    await test.step(`Fill the registration form for "${details.username}"`, async () => {
+      await this.usernameInput.fill(details.username);
+      await this.firstNameInput.fill(details.firstName);
+      await this.lastNameInput.fill(details.lastName);
+      await this.emailInput.fill(details.email);
+      await this.countrySelect.selectOption(details.country);
+      await this.passwordInput.fill(details.password);
+    });
   }
 }

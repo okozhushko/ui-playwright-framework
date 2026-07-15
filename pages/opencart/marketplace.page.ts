@@ -1,3 +1,4 @@
+import { test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { OpenCartBasePage } from './opencart-base.page';
 import { NavComponent } from '../components/nav.component';
@@ -55,12 +56,16 @@ export class MarketplacePage extends OpenCartBasePage {
   }
 
   async search(term: string): Promise<void> {
-    await this.searchInput.fill(term);
-    await this.searchButton.click();
+    await test.step(`Search the Marketplace for "${term}"`, async () => {
+      await this.searchInput.fill(term);
+      await this.searchButton.click();
+    });
   }
 
   async sortBy(option: string): Promise<void> {
-    await this.sortBySelect.selectOption(option);
+    await test.step(`Sort the Marketplace results by "${option}"`, async () => {
+      await this.sortBySelect.selectOption(option);
+    });
   }
 
   /**
@@ -70,7 +75,9 @@ export class MarketplacePage extends OpenCartBasePage {
    * the same page), so don't route that value through here.
    */
   async filterByCategory(name: string): Promise<void> {
-    await this.page.getByRole('link', { name, exact: true }).click();
+    await test.step(`Filter the Marketplace by category "${name}"`, async () => {
+      await this.page.getByRole('link', { name, exact: true }).click();
+    });
   }
 
   /** The clean title link for a single result, by its exact visible name. */

@@ -1,3 +1,4 @@
+import { test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { OpenCartBasePage } from './opencart-base.page';
 import { NavComponent } from '../components/nav.component';
@@ -46,8 +47,10 @@ export class OpenCartLoginPage extends OpenCartBasePage {
   }
 
   async login(email: string, password: string): Promise<void> {
-    await this.emailInput.fill(email);
-    await this.passwordInput.fill(password);
-    await this.loginButton.click();
+    await test.step(`Log in as "${email}"`, async () => {
+      await this.emailInput.fill(email);
+      await this.passwordInput.fill(password);
+      await this.loginButton.click();
+    });
   }
 }

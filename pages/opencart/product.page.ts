@@ -1,3 +1,4 @@
+import { test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { OpenCartBasePage } from './opencart-base.page';
 import { NavComponent } from '../components/nav.component';
@@ -74,11 +75,15 @@ export class ProductPage extends OpenCartBasePage {
    * `tests/opencart/cart-checkout.spec.ts`.
    */
   async buy(): Promise<void> {
-    await this.buyButton.click();
+    await test.step('Click Buy', async () => {
+      await this.buyButton.click();
+    });
   }
 
   /** Same auth-gated behavior as `buy()`, for free extensions. */
   async download(): Promise<void> {
-    await this.downloadLink.click();
+    await test.step('Click Download', async () => {
+      await this.downloadLink.click();
+    });
   }
 }
