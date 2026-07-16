@@ -133,12 +133,25 @@ This project intentionally does **not** ship an authenticated/`storageState` fix
 
 - **Two jobs, gated:** `quality-gates` (typecheck + a leftover `test.only()`/`describe.only()` check) must pass before the slower, live-site `e2e` job installs a browser and runs anything against opencart.com.
 - **`concurrency`** cancels a stale in-flight run when a new one starts on the same branch — avoids two runs hammering opencart.com at once.
-- **`permissions: contents: read`** — least privilege; nothing here needs to write to the repo.
+- **`permissions: contents: read`** at the workflow level — least privilege; nothing here needs to write to the repo. The `e2e` job overrides this to `contents: write` for itself only, because (and only because) it has a step that pushes to the `test-history` branch — see **Test history dashboard** below.
 - Actions are pinned by commit SHA (with a version comment), not a mutable tag — see `.github/dependabot.yml`, which opens a PR to bump both when a new release ships.
 - Both `node_modules` (skips `npm ci` entirely on a hit, not just speeds it up) and Playwright's browser binary are cached (`actions/cache`, both keyed on `package-lock.json`) between runs, in both jobs.
 - The whole `playwright test` invocation is wrapped in an outer retry (`nick-fields/retry`, 2 attempts) — distinct from Playwright's own per-test `retries` above — specifically to give opencart.com's Cloudflare rate limiting a chance to clear before the next attempt.
 - `.github/scripts/check-flaky-passes.js` reads the JSON reporter's per-attempt data to flag (warn, not fail) any test that only passed after a retry — surfacing exactly what the **Retries** section above says to watch for, instead of letting a green checkmark hide it.
 - `.github/scripts/write-job-summary.js` posts a pass/fail/skip/flaky count table to the run's Summary page.
+- `.github/scripts/publish-test-history.sh` (push-to-`main` runs only) records this run's counts and republishes the dashboard below — see the next section.
+
+## Test history dashboard
+
+Every push to `main` appends one record (timestamp, git SHA, branch, `TEST_ENV`, pass/fail/skip/flaky counts, duration) to a running history, and regenerates a static HTML dashboard from it — a lightweight, dependency-free alternative to standing up a third-party reporting service just to see a trend line.
+
+- **What it shows:** total test count over time (is the suite growing?), pass rate per run, a stacked bar of passed/flaky/failed/skipped counts per run, and the most recent runs in a plain table. Flaky counts are called out in amber wherever they appear, since — per the **Retries** section above — a flaky pass is a bug to chase, not noise to ignore.
+- **Where it lives:** `history.json` and `dashboard.html` on a dedicated **`test-history`** branch, not on `main` and not under `reports/` (which is git-ignored and rebuilt from scratch every CI checkout — see `.gitignore` — so it can't hold anything across runs on its own). `.github/scripts/publish-test-history.sh` has the full trade-off written out, but in short: committing straight to `main` would re-trigger this very workflow (`push: branches: [main]`) on every run just to publish a stats update, doubling up on the already rate-limit-sensitive `e2e` job for no reason. An unrelated branch that nothing else is configured to trigger on avoids that entirely.
+- **How to view it:**
+  - Locally: `git fetch origin test-history && git show origin/test-history:dashboard.html > /tmp/dashboard.html && open /tmp/dashboard.html` (or check out the branch directly). The file is fully static — no server, build step, or network access required to render it.
+  - Via GitHub Pages: enable Pages for this repo (Settings → Pages → Source → Deploy from a branch → `test-history` / `/ (root)`, a one-time manual setting change nobody has turned on yet), then it's at `https://<owner>.github.io/<repo>/dashboard.html`.
+- **Scope:** only pushes to `main` append a record (not PRs, not the nightly schedule, not `workflow_dispatch` spot-checks) — see the comment on the workflow step for why. A failing run is still recorded (`if: always()`), since a dashboard that only shows green runs would hide exactly the trend it exists to surface.
+- **Growth control:** the history file is capped at the most recent 500 runs (`MAX_HISTORY_ENTRIES` in `append-test-history.js`) so it doesn't grow forever — full per-run detail (logs, traces) always still lives on that run's own Actions page/artifacts.
 
 ## Debugging & the trace viewer
 
@@ -184,3 +197,4 @@ opencart.com itself has no separate dev/stage deployment of its own, so all thre
 | Timeouts | `playwright.config.ts` (`timeout`, `expect.timeout`, `actionTimeout`, `navigationTimeout`) | Per-test/action overrides via `test.setTimeout()` if a specific test genuinely needs more |
 | Browsers | `playwright.config.ts` `projects` | Chromium, Firefox, WebKit configured; add/remove as needed |
 | Reports | `playwright.config.ts` `reporter` / `outputDir` | HTML + JUnit, all under `reports/` |
+| Test history / dashboard | `.github/scripts/{append-test-history,generate-dashboard,publish-test-history.sh}` | Persisted on the `test-history` branch — see **Test history dashboard** above |

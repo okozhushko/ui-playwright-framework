@@ -109,6 +109,16 @@ jobs:
     # 10 minutes each) plus setup/install overhead.
     timeout-minutes: 30
 
+    # Overrides the workflow-level `contents: read` default for this job
+    # only — the "Append run to test history & publish dashboard" step below
+    # pushes a commit to the `test-history` branch (via the token
+    # `actions/checkout` already wires up for git), which needs `write`.
+    # Harmless on PR/schedule/dispatch runs where that step doesn't
+    # execute; still least-privilege in the sense that it's scoped to the
+    # one job that needs it, not added workflow-wide.
+    permissions:
+      contents: write
+
     env:
       CI: 'true'
       # Which of DEV/STAGE/PROD to run against (see config/env.ts) — only
@@ -198,6 +208,17 @@ jobs:
       - name: Write job summary
         if: always()
         run: node .github/scripts/write-job-summary.js reports/results.json
+
+      # Deliberately last among the "read reports/results.json" steps above,
+      # and gated to `push` events on `main` only (not PRs, not
+      # workflow_dispatch spot-checks, not the nightly schedule) — see
+      # publish-test-history.sh's own header comment for the full "why not
+      # commit to main / why not every trigger" reasoning. `always()` so a
+      # failing run still gets recorded — a dashboard that only shows green
+      # runs would hide exactly the trend it exists to surface.
+      - name: Append run to test history & publish dashboard
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: .github/scripts/publish-test-history.sh reports/results.json
 
       - name: Upload HTML report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
