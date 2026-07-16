@@ -28,6 +28,7 @@ The suite under `tests/opencart/` covers [opencart.com](https://www.opencart.com
 ├── fixtures/
 │   └── base.fixture.ts        # test.extend(...) wiring Page Objects into fixtures
 ├── utils/
+│   ├── api-auth.ts            # API-based authentication service for login via POST
 │   └── worker-scope.ts        # Helper for per-worker-unique test data
 ├── reporters/
 │   ├── custom-reporter.ts     # Terminal reporter used instead of the built-in `list` — see below
@@ -114,7 +115,32 @@ Rules of thumb:
 
 `fixtures/base.fixture.ts` extends Playwright's `test` with one fixture per Page Object (`loginPage`, `secureAreaPage`, ...), created fresh per test. Import `test`/`expect` from this file in every spec instead of `@playwright/test` directly.
 
-This project intentionally does **not** ship an authenticated/`storageState` fixture or data factories/builders — designing those (auth session reuse via `globalSetup`, realistic domain data builders, network mocking) is a `test-data-engineer` concern. If your suite needs one, that's the place to add it; this file is where you'd consume it once it exists.
+### Authenticated page fixture
+
+The `authenticatedPage` fixture provides a page with an active login session already in place. Instead of navigating to a login form and filling it out (slow, flaky), it logs in via API before the test runs, setting valid session cookies on the page:
+
+```ts
+import { test, expect } from '../fixtures/base.fixture';
+
+test('access protected page while logged in', async ({ authenticatedPage }) => {
+  // Page already has session cookies from API login
+  await authenticatedPage.goto('/secure');
+  await expect(authenticatedPage.locator('h1')).toContainText('Secure Area');
+});
+```
+
+**How it works:**
+- `ApiAuth` (in `utils/api-auth.ts`) sends a POST request to `/login` with `TEST_USER_USERNAME` and `TEST_USER_PASSWORD` from `.env`.
+- The response's `Set-Cookie` header is parsed to extract session cookies.
+- Cookies are added to the page context before the test runs.
+- Your test inherits the fully authenticated page, ready to access protected routes.
+
+**Benefits over UI-based login:**
+- **Fast:** No waiting for page loads, form fills, or button clicks.
+- **Reliable:** API calls don't flake on UI timing issues or Cloudflare challenges (unlike navigating to a login form).
+- **Readable:** The test's body focuses on what you're actually testing, not login mechanics.
+
+This project intentionally does **not** ship data factories/builders or network mocking — designing those is a `test-data-engineer` concern. If your suite needs them, that's the place to add it.
 
 ## Parallel execution
 

@@ -1,9 +1,11 @@
-import { test as base } from '@playwright/test';
+import { test as base, type Page } from '@playwright/test';
 import { OpenCartHomePage } from '../pages/opencart/home.page';
 import { MarketplacePage } from '../pages/opencart/marketplace.page';
 import { ProductPage } from '../pages/opencart/product.page';
 import { OpenCartLoginPage } from '../pages/opencart/login.page';
 import { OpenCartRegisterPage } from '../pages/opencart/register.page';
+import { ApiAuth } from '../utils/api-auth';
+import { env } from '../config/env';
 
 /**
  * Extends the base Playwright `test` with one fixture per Page Object, so
@@ -11,10 +13,6 @@ import { OpenCartRegisterPage } from '../pages/opencart/register.page';
  * OpenCartHomePage(page)` everywhere. Each fixture is created fresh per test
  * (default scope), which is what keeps tests independent and safe to run
  * `fullyParallel`.
- *
- * Auth/session shortcuts (e.g. a `storageState`-backed `authenticatedPage`
- * fixture via `globalSetup`) are intentionally NOT included here — wiring
- * that up is a test-data-engineer concern. Flag it if a suite needs one.
  */
 type Fixtures = {
   openCartHomePage: OpenCartHomePage;
@@ -22,6 +20,7 @@ type Fixtures = {
   productPage: ProductPage;
   openCartLoginPage: OpenCartLoginPage;
   openCartRegisterPage: OpenCartRegisterPage;
+  authenticatedPage: Page;
 };
 
 export const test = base.extend<Fixtures>({
@@ -43,6 +42,24 @@ export const test = base.extend<Fixtures>({
 
   openCartRegisterPage: async ({ page }, use) => {
     await use(new OpenCartRegisterPage(page));
+  },
+
+  authenticatedPage: async ({ page, request }, use) => {
+    const apiAuth = new ApiAuth(request, env.baseURL);
+    const cookies = await apiAuth.login(env.credentials.username, env.credentials.password);
+
+    // Add session cookies to the page
+    for (const [name, value] of Object.entries(cookies)) {
+      await page.context().addCookies([
+        {
+          name,
+          value,
+          url: env.baseURL,
+        },
+      ]);
+    }
+
+    await use(page);
   },
 });
 
