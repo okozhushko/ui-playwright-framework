@@ -30,6 +30,12 @@ export default defineConfig({
 
   // Undefined lets Playwright pick a sensible default per machine; CI runners
   // are often constrained, so cap workers there to avoid resource starvation.
+  //
+  // Tried bumping this to 4, then 3, to speed up the pipeline — both
+  // measurably tripped opencart.com's Cloudflare rate limiter in local
+  // trial runs (5/21 tests failing on HTTP 429 each time, caught by
+  // OpenCartBasePage.assertNotRateLimited). Reverted back to `'50%'`
+  // (~2 workers on GitHub's standard runner), the last known-stable value.
   workers: env.isCI ? '50%' : undefined,
 
   fullyParallel: true,
