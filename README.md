@@ -161,11 +161,26 @@ A from-scratch terminal reporter, used instead of the built-in `list`. Replaced 
 
 It also prints each `test.step()` live as it runs (see **Page Objects** above) and a clickable screenshot link on failure (`reporters/terminal-links.ts` — an OSC 8 terminal hyperlink, confirmed live that relying on a terminal to *heuristically* recognize a bare path as a link isn't reliable enough; only emitted when `process.stdout.isTTY`, so a non-interactive log doesn't get raw escape-byte clutter). The `html`/`junit`/`json` reporters are unaffected and still produce their usual artifacts under `reports/`.
 
+## Environments (DEV/STAGE/PROD)
+
+`TEST_ENV=dev|stage|prod` (see `config/env.ts`) picks which of `OPENCART_DEV_BASE_URL` / `OPENCART_STAGE_BASE_URL` / `OPENCART_PROD_BASE_URL` the OpenCart suite runs against — defaults to `prod` if unset.
+
+```bash
+npm run test:dev     # TEST_ENV=dev
+npm run test:stage   # TEST_ENV=stage
+npm run test:prod    # TEST_ENV=prod (same as npm test)
+```
+
+opencart.com itself has no separate dev/stage deployment of its own, so all three default to the same production URL out of the box — this is the extensibility point for a team adapting this framework for an application that genuinely has separate per-environment deployments, not a claim that opencart.com has three real environments. `OPENCART_BASE_URL`, if set, overrides all three regardless of `TEST_ENV` (commented out by default in `.env.example` — see its comment for why leaving it active would silently defeat `TEST_ENV` switching). An invalid `TEST_ENV` value fails fast with a clear error rather than silently falling back.
+
+`.github/workflows/playwright.yml`'s `workflow_dispatch` has an `environment` input for the same choice on a manual CI run.
+
 ## Configuration reference
 
 | Concern | Where | Notes |
 |---|---|---|
 | Base URL / env vars | `.env` (via `config/env.ts`) | Never read `process.env` directly in tests/pages |
+| Target environment | `TEST_ENV` (via `config/env.ts`) | `dev` / `stage` / `prod`, see **Environments** above |
 | Timeouts | `playwright.config.ts` (`timeout`, `expect.timeout`, `actionTimeout`, `navigationTimeout`) | Per-test/action overrides via `test.setTimeout()` if a specific test genuinely needs more |
 | Browsers | `playwright.config.ts` `projects` | Chromium, Firefox, WebKit configured; add/remove as needed |
 | Reports | `playwright.config.ts` `reporter` / `outputDir` | HTML + JUnit, all under `reports/` |

@@ -28,6 +28,11 @@ on:
         description: 'Optional: specific spec file/glob (leave empty for the whole suite)'
         type: string
         required: false
+      environment:
+        description: Which environment to run against (see config/env.ts)
+        type: choice
+        options: [dev, stage, prod]
+        default: prod
 
 # A new push/dispatch on the same branch supersedes any run already in
 # flight instead of piling up alongside it — this is exactly what protected
@@ -106,6 +111,11 @@ jobs:
 
     env:
       CI: 'true'
+      # Which of DEV/STAGE/PROD to run against (see config/env.ts) — only
+      # meaningful on workflow_dispatch, where it's a pickable input; falls
+      # back to "prod" on push/PR/schedule, matching the input's own
+      # default.
+      TEST_ENV: ${{ github.event.inputs.environment || 'prod' }}
 
     steps:
       - name: Checkout
