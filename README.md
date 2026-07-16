@@ -135,7 +135,7 @@ This project intentionally does **not** ship an authenticated/`storageState` fix
 - **`concurrency`** cancels a stale in-flight run when a new one starts on the same branch — avoids two runs hammering opencart.com at once.
 - **`permissions: contents: read`** — least privilege; nothing here needs to write to the repo.
 - Actions are pinned by commit SHA (with a version comment), not a mutable tag — see `.github/dependabot.yml`, which opens a PR to bump both when a new release ships.
-- Playwright's browser binary is cached (`actions/cache`, keyed on `package-lock.json`) between runs.
+- Both `node_modules` (skips `npm ci` entirely on a hit, not just speeds it up) and Playwright's browser binary are cached (`actions/cache`, both keyed on `package-lock.json`) between runs, in both jobs.
 - The whole `playwright test` invocation is wrapped in an outer retry (`nick-fields/retry`, 2 attempts) — distinct from Playwright's own per-test `retries` above — specifically to give opencart.com's Cloudflare rate limiting a chance to clear before the next attempt.
 - `.github/scripts/check-flaky-passes.js` reads the JSON reporter's per-attempt data to flag (warn, not fail) any test that only passed after a retry — surfacing exactly what the **Retries** section above says to watch for, instead of letting a green checkmark hide it.
 - `.github/scripts/write-job-summary.js` posts a pass/fail/skip/flaky count table to the run's Summary page.
