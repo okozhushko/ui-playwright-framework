@@ -10,7 +10,12 @@ test.describe('OpenCart.com homepage', () => {
     await openCartHomePage.goto();
   });
 
-  test('renders the hero heading and primary navigation', async ({ openCartHomePage }) => {
+  // The one @smoke pick for this file: confirms the homepage itself loads
+  // and its primary nav is intact — the fastest possible signal that this
+  // production site hasn't fundamentally changed shape.
+  test('renders the hero heading and primary navigation', { tag: '@smoke' }, async ({
+    openCartHomePage,
+  }) => {
     await expect(openCartHomePage.heroHeading).toBeVisible();
     await expect(openCartHomePage.nav.featuresLink).toBeVisible();
     await expect(openCartHomePage.nav.marketplaceLink).toBeVisible();
@@ -18,7 +23,7 @@ test.describe('OpenCart.com homepage', () => {
     await expect(openCartHomePage.nav.registerLink).toBeVisible();
   });
 
-  test('navigates to the Marketplace via the top nav', async ({
+  test('navigates to the Marketplace via the top nav', { tag: '@regression' }, async ({
     openCartHomePage,
     marketplacePage,
     page,
@@ -35,7 +40,8 @@ test.describe('OpenCart.com homepage', () => {
   // challenge to every fresh, automated Playwright browser context on this
   // production site (confirmed reproducible, headless and headed, waiting
   // 20+ seconds) — not something a test fix or a longer wait can resolve.
-  test.skip('navigates to the login page via the top nav', async ({
+  // eslint-disable-next-line playwright/no-skipped-test -- documented, unfixable Cloudflare bot-challenge, see the comment directly above.
+  test.skip('navigates to the login page via the top nav', { tag: '@regression' }, async ({
     openCartHomePage,
     openCartLoginPage,
     page,
@@ -46,7 +52,8 @@ test.describe('OpenCart.com homepage', () => {
     await expect(openCartLoginPage.heading).toBeVisible();
   });
 
-  test.skip('navigates to the register page via the top nav', async ({
+  // eslint-disable-next-line playwright/no-skipped-test -- documented, unfixable Cloudflare bot-challenge, see the comment above the previous test.
+  test.skip('navigates to the register page via the top nav', { tag: '@regression' }, async ({
     openCartHomePage,
     openCartRegisterPage,
     page,

@@ -38,7 +38,13 @@ import { uniqueId } from '../../utils/worker-scope';
  * allowlisted runner) — that's a test-data-engineer / infra concern to flag,
  * not something to work around here with a stealth/bot-evasion hack.
  */
-test.describe.skip('Login', () => {
+// Tagged @regression at the describe level (not @smoke): every test below is
+// `.skip`ped anyway (see the file-level comment above), so none of them can
+// serve as a fast, passing smoke signal — and the exhaustive
+// invalid-credentials/registration-form coverage here is exactly the kind of
+// edge-case depth @regression is for.
+// eslint-disable-next-line playwright/no-skipped-test -- documented, unfixable Cloudflare bot-challenge, see the file-level comment above.
+test.describe.skip('Login', { tag: '@regression' }, () => {
   test.beforeEach(async ({ openCartLoginPage }) => {
     await openCartLoginPage.goto();
   });
@@ -74,7 +80,8 @@ test.describe.skip('Login', () => {
   });
 });
 
-test.describe.skip('Registration form', () => {
+// eslint-disable-next-line playwright/no-skipped-test -- documented, unfixable Cloudflare bot-challenge, see the file-level comment above.
+test.describe.skip('Registration form', { tag: '@regression' }, () => {
   test.beforeEach(async ({ openCartRegisterPage }) => {
     await openCartRegisterPage.goto();
   });

@@ -67,6 +67,8 @@ npm run test:headed        # headed (visible browser)
 npm run test:ui            # Playwright's interactive UI mode — best for authoring
 npm run test:debug         # Playwright Inspector, step-through debugging
 npm run test:chromium      # single project only
+npm run test:smoke         # @smoke only — see "Smoke vs. regression tests" below
+npm run test:regression    # @regression only
 npx playwright test tests/example/login.spec.ts   # single file
 npx playwright test -g "signs in with valid"       # single test by title
 ```
@@ -76,6 +78,24 @@ View the last HTML report:
 ```bash
 npm run report
 ```
+
+## Smoke vs. regression tests
+
+Every test in `tests/opencart/` is tagged `@smoke` or `@regression` — Playwright's built-in `tag` option (`test('...', { tag: '@smoke' }, ...)`), not a title convention, so tags show up in the HTML/JUnit/JSON reports and are filterable via `--grep` without any custom matching logic.
+
+- **`@smoke`** (5 tests, one representative happy-path test per spec file that has a passing test): homepage loads (`home.spec.ts`), Marketplace search returns results (`marketplace-search.spec.ts`), a product detail page renders (`product.spec.ts`), the Buy→login redirect that stands in for checkout on this site (`cart-checkout.spec.ts`), and the rate-limit guard itself (`rate-limit-handling.spec.ts`). Chosen for being fast, deterministic, and each proving a genuinely different core flow works — not arbitrary.
+- **`@regression`** (16 tests): everything else — the more exhaustive/edge-case coverage (zero-result search, category filters, sort order, free-vs-paid product variants, etc.), plus every test inside the two `.skip`ped `describe` blocks in `account.spec.ts` (tagged at the `describe` level, since none of them can run/pass anyway — see the "OpenCart.com suite" section above — so none can serve as a smoke signal).
+
+Run either bucket locally:
+
+```bash
+npm run test:smoke
+npm run test:regression
+# or, equivalently:
+npx playwright test --grep @smoke
+```
+
+**In CI** (`.github/workflows/playwright.yml`, `e2e` job): `pull_request` runs `@smoke` only, for fast feedback and less load against opencart.com's rate-limited Cloudflare edge; `push` to `main`, the nightly `schedule`, and `workflow_dispatch` all run the full suite (`@smoke` + `@regression`). See the comment on the "Run Playwright tests" step for exactly how the `--grep` flag is built per-trigger and how it composes with `workflow_dispatch`'s `spec` input.
 
 ## Writing a new test
 
@@ -131,7 +151,7 @@ This project intentionally does **not** ship an authenticated/`storageState` fix
 
 `.github/workflows/playwright.yml` runs on push/PR to `main`, nightly (`01:00 UTC`), and on demand (`workflow_dispatch`, with inputs to pick a project or a specific spec).
 
-- **Two jobs, gated:** `quality-gates` (typecheck + a leftover `test.only()`/`describe.only()` check) must pass before the slower, live-site `e2e` job installs a browser and runs anything against opencart.com.
+- **Two jobs, gated:** `quality-gates` (typecheck + `npm run lint` + a leftover `test.only()`/`describe.only()` check) must pass before the slower, live-site `e2e` job installs a browser and runs anything against opencart.com. Lint is `eslint.config.js` (flat config) running `typescript-eslint`'s recommended rules plus `eslint-plugin-playwright`'s recommended rules on `pages/`, `tests/`, and `fixtures/` (the directories that actually touch the Playwright Page/Locator/test API) — run it locally with `npm run lint`.
 - **`concurrency`** cancels a stale in-flight run when a new one starts on the same branch — avoids two runs hammering opencart.com at once.
 - **`permissions: contents: read`** at the workflow level — least privilege; nothing here needs to write to the repo. The `e2e` job overrides this to `contents: write` for itself only, because (and only because) it has a step that pushes to the `test-history` branch — see **Test history dashboard** below.
 - Actions are pinned by commit SHA (with a version comment), not a mutable tag — see `.github/dependabot.yml`, which opens a PR to bump both when a new release ships.

@@ -29,7 +29,7 @@ const FREE_EXTENSION_ID = 32336; // "Facebook for OpenCart"
 const PAID_EXTENSION_ID = 21842; // "Pro Email Template"
 
 test.describe('Buy / Download require authentication', () => {
-  test('clicking Download while signed out redirects to the login page', async ({
+  test('clicking Download while signed out redirects to the login page', { tag: '@regression' }, async ({
     productPage,
     page,
   }) => {
@@ -40,7 +40,10 @@ test.describe('Buy / Download require authentication', () => {
     await expect(page).toHaveURL(/route=account\/login/);
   });
 
-  test('clicking Buy while signed out redirects to the login page', async ({
+  // The one @smoke pick for this file: this site's Buy → login redirect is
+  // the closest thing it has to a "core checkout flow" (see the file-level
+  // comment above) — Buy over Download since it's the commercial path.
+  test('clicking Buy while signed out redirects to the login page', { tag: '@smoke' }, async ({
     productPage,
     page,
   }) => {

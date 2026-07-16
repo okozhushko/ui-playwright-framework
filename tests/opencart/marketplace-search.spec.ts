@@ -9,7 +9,9 @@ test.describe('Marketplace search and filters', () => {
     await marketplacePage.goto();
   });
 
-  test('searching for a known term returns matching extensions', async ({
+  // The one @smoke pick for this file: proves the core Marketplace search
+  // flow (this site's "product catalog" search) actually returns results.
+  test('searching for a known term returns matching extensions', { tag: '@smoke' }, async ({
     marketplacePage,
     page,
   }) => {
@@ -19,7 +21,7 @@ test.describe('Marketplace search and filters', () => {
     await expect(marketplacePage.resultLinks.first()).toBeVisible();
   });
 
-  test('searching for a term with no matches returns zero results', async ({ marketplacePage }) => {
+  test('searching for a term with no matches returns zero results', { tag: '@regression' }, async ({ marketplacePage }) => {
     // Confirmed live: OpenCart.com renders no "no results" message for a
     // search with zero matches — the result grid (and its "Featured"
     // heading) is simply omitted. Asserting on the absence of result links
@@ -29,7 +31,7 @@ test.describe('Marketplace search and filters', () => {
     await expect(marketplacePage.resultLinks).toHaveCount(0);
   });
 
-  test('filtering by the Themes category scopes the result set', async ({
+  test('filtering by the Themes category scopes the result set', { tag: '@regression' }, async ({
     marketplacePage,
     page,
   }) => {
@@ -39,7 +41,7 @@ test.describe('Marketplace search and filters', () => {
     await expect(marketplacePage.resultLinks.first()).toBeVisible();
   });
 
-  test('sorting by Name updates the sort order in the URL', async ({ marketplacePage, page }) => {
+  test('sorting by Name updates the sort order in the URL', { tag: '@regression' }, async ({ marketplacePage, page }) => {
     await marketplacePage.sortBy('Name');
 
     await expect(page).toHaveURL(/sort=name/);

@@ -15,7 +15,10 @@ import { test, expect } from '../../fixtures/base.fixture';
  * conditions — it exercises the *handling*, not the live limiter itself.
  */
 test.describe('Cloudflare rate-limit handling', () => {
-  test('gotoPath fails fast with a clear message on an HTTP 429, instead of a misleading locator timeout', async ({
+  // The one @smoke pick for this file: this is the rate-limit guard itself
+  // (`OpenCartBasePage.assertNotRateLimited`) — high-value and fast since
+  // it's mocked, not dependent on the live limiter actually tripping.
+  test('gotoPath fails fast with a clear message on an HTTP 429, instead of a misleading locator timeout', { tag: '@smoke' }, async ({
     page,
     openCartHomePage,
   }) => {
@@ -32,7 +35,7 @@ test.describe('Cloudflare rate-limit handling', () => {
     );
   });
 
-  test('gotoPath does not throw on a normal, non-429 response', async ({ page, marketplacePage }) => {
+  test('gotoPath does not throw on a normal, non-429 response', { tag: '@regression' }, async ({ page, marketplacePage }) => {
     await page.route('**/index.php?route=marketplace/extension', (route) =>
       route.fulfill({
         status: 200,

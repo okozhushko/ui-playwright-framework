@@ -88,6 +88,15 @@ jobs:
       - name: Type-check
         run: npm run typecheck
 
+      # Flat-config ESLint (eslint.config.js) + eslint-plugin-playwright's
+      # recommended ruleset — catches real Playwright anti-patterns (a
+      # missing await, a raw `waitForTimeout`, a conditional inside a test)
+      # automatically instead of relying on manual review to spot them.
+      # Fast and network-free, so it belongs in this gate rather than the
+      # live-site e2e job below.
+      - name: Lint
+        run: npm run lint
+
       # Belt-and-braces alongside playwright.config.ts's `forbidOnly` (which
       # only fails at test-run time, after browsers are already installed
       # and the suite has started hitting the live site) — this catches an
@@ -188,13 +197,31 @@ jobs:
       # -down before a fresh full run has a real chance of succeeding —
       # confirmed live during development that a rate-limited run recovered
       # on a later, independent invocation.
+      #
+      # Test selection: `pull_request` runs `@smoke` only — fast feedback on
+      # a PR, and less load against opencart.com's rate-limited Cloudflare
+      # edge (see the "workers" comment in playwright.config.ts for how
+      # easily this site's limiter trips). Every other trigger (`push` to
+      # main, the nightly `schedule`, and `workflow_dispatch`) runs the full
+      # suite (`@smoke` + `@regression`) — those are lower-frequency,
+      # deliberate runs where the full signal is worth the extra load.
+      # `a && b || c` is the standard GitHub Actions ternary idiom (there's
+      # no native `?:` in expression syntax).
+      #
+      # Composability with the `spec` input: this only ever adds a `--grep`
+      # flag, never touches `github.event.inputs.spec`, which still lands in
+      # the command verbatim afterwards — so a workflow_dispatch run can
+      # combine both (e.g. `spec: tests/opencart/product.spec.ts`, still
+      # against the full suite since dispatch isn't `pull_request`), or a
+      # user who wants smoke-only via dispatch can just type `--grep @smoke`
+      # into the `spec` box themselves, same as any other extra CLI arg.
       - name: Run Playwright tests
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 10
           max_attempts: 2
           retry_wait_seconds: 45
-          command: npx playwright test --project=${{ github.event.inputs.project || 'chromium' }} ${{ github.event.inputs.spec }}
+          command: npx playwright test --project=${{ github.event.inputs.project || 'chromium' }} ${{ github.event_name == 'pull_request' && '--grep @smoke' || '' }} ${{ github.event.inputs.spec }}
 
       # Quality gate: reads the JSON reporter's per-attempt results (see
       # playwright.config.ts) to flag any test that only passed after
