@@ -248,7 +248,7 @@ jobs:
         run: .github/scripts/publish-test-history.sh reports/results.json
 
       - name: Upload HTML report
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           # Suffixed by project so this stays collision-free if
@@ -258,7 +258,7 @@ jobs:
           retention-days: 14
 
       - name: Upload traces, screenshots & videos
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-test-results-${{ github.event.inputs.project || 'chromium' }}
@@ -267,7 +267,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload JUnit results
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: playwright-junit-${{ github.event.inputs.project || 'chromium' }}
