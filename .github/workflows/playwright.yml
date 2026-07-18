@@ -76,7 +76,7 @@ jobs:
       # separately-cached concern below — this is only the npm packages).
       - name: Cache node_modules
         id: node-modules-cache
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
@@ -152,7 +152,7 @@ jobs:
       # populated (or vice versa, whichever job's cache step runs first).
       - name: Cache node_modules
         id: node-modules-cache
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
           key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
@@ -166,7 +166,7 @@ jobs:
       # hash instead of re-downloading on every single run.
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
